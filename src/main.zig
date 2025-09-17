@@ -80,7 +80,7 @@ export fn init() void {
 
     // initialize imgui save
     const io = ig.igGetIO();
-    io.*.IniFilename = "imgui.ini";
+    io.*.IniFilename = "src/imgui.ini";
 
     // initial clear color
     state.pass_action.colors[0] = .{

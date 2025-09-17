@@ -108,18 +108,24 @@ export fn frame() void {
     }
 
     // ui-code
-    if (ig.igBegin("STATUS", &state.b, ig.ImGuiWindowFlags_None)) {
-        _ = ig.igColorEdit3("Background", &state.pass_action.colors[0].clear_value.r, ig.ImGuiColorEditFlags_None);
+    // STATUS WINDOW
+    if (ig.igBegin("STATUS", &state.b, 0)) {
+        _ = ig.igColorEdit3("Background", &state.pass_action.colors[0].clear_value.r, 0);
         _ = ig.igText("Dear ImGui Version: %s", ig.IMGUI_VERSION);
     } ig.igEnd();
+    // TRIANGLE DEBUG WINDOW
     if (state.show_w) {
-        if (ig.igBegin("TRIANGLE", &state.b, ig.ImGuiWindowFlags_None)) {
-            _ = ig.igColorEdit3("Color1", &state.vertices[0].color, ig.ImGuiColorEditFlags_None);
-            _ = ig.igColorEdit3("Color2", &state.vertices[1].color, ig.ImGuiColorEditFlags_None);
-            _ = ig.igColorEdit3("Color3", &state.vertices[2].color, ig.ImGuiColorEditFlags_None);
-            _ = ig.igDragFloat2Ex("Pos1", &state.vertices[0].pos[0], 0.1, -50, 50, "%.3f", ig.ImGuiColorEditFlags_None);
-            _ = ig.igDragFloat2Ex("Pos2", &state.vertices[1].pos[0], 0.1, -50, 50, "%.3f", ig.ImGuiColorEditFlags_None);
-            _ = ig.igDragFloat2Ex("Pos3", &state.vertices[2].pos[0], 0.1, -50, 50, "%.3f", ig.ImGuiColorEditFlags_None);
+        if (ig.igBegin("TRIANGLE", &state.b, 0)) {
+            if (ig.igCollapsingHeader("Colors", 0)) {
+                _ = ig.igColorEdit3("Color1", &state.vertices[0].color, 0);
+                _ = ig.igColorEdit3("Color2", &state.vertices[1].color, 0);
+                _ = ig.igColorEdit3("Color3", &state.vertices[2].color, 0);
+            }
+            if (ig.igCollapsingHeader("Positions", 0)) {
+                _ = ig.igDragFloat2Ex("Pos1", &state.vertices[0].pos[0], 0.1, -50, 50, "%.3f", 0);
+                _ = ig.igDragFloat2Ex("Pos2", &state.vertices[1].pos[0], 0.1, -50, 50, "%.3f", 0);
+                _ = ig.igDragFloat2Ex("Pos3", &state.vertices[2].pos[0], 0.1, -50, 50, "%.3f", 0);
+            }
         } ig.igEnd();
     } // ig.igEnd();
 

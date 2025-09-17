@@ -37,7 +37,7 @@ fn point_in_triangle(p: v2, t: [3][3]f32) bool {
     const b = [2]f32{ t[1][0] - t[0][0], t[1][1] - t[0][1] };
     const c = [2]f32{ p.pos[0] - t[0][0], p.pos[1] - t[0][1] };
     const inv = 1.0 / (
-    //   a[0] * a[0] + a[1] * a[1] -> get d between a[0] and a[1]
+    //   a[0] * a[0] + a[1] * a[1] -> get dist between a[0] and a[1]
         (a[0] * a[0] + a[1] * a[1]) * (b[0] * b[0] + b[1] * b[1]) -
         (a[0] * b[0] + a[1] * b[1]) * (a[0] * b[0] + a[1] * b[1]));
     const u = (

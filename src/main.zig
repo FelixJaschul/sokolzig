@@ -10,8 +10,7 @@ const simgui = sokol.imgui;
 const std = @import("std");
 
 const v2 = struct {
-    x: f32 = 0.0,
-    y: f32 = 0.0,
+    pos: [3]f32,
 };
 
 const v2c = struct {
@@ -25,27 +24,29 @@ const state = struct {
     var bind: sg.Bindings = .{};
     var pip: sg.Pipeline = .{};
     var vertices: [3]v2c = [3]v2c{
-        v2c{ .pos = .{ 0.0,  0.5,  0.5 }, .color = .{ 1.0, 0.0, 0.0, 1.0 } },
-        v2c{ .pos = .{ 0.5, -0.5,  0.5 }, .color = .{ 0.0, 1.0, 0.0, 1.0 } },
+        v2c{ .pos = .{ 0.0,  0.5,  0.5 }, .color = .{ 1.0, 0.0, 0.9, 1.0 } },
+        v2c{ .pos = .{ 0.5, -0.5,  0.5 }, .color = .{ 0.0, 1.0, 0.9, 1.0 } },
         v2c{ .pos = .{ -0.5, -0.5, 0.5 }, .color = .{ 0.0, 0.0, 1.0, 1.0 } },
     };
     var show_w: bool = false;
     var mouse_pos: v2 = undefined;
 };
 
-fn pointInTriangle(p: v2, tri: [3][3]f32) bool {
-    const v0 = [2]f32{ tri[2][0] - tri[0][0], tri[2][1] - tri[0][1] };
-    const v1 = [2]f32{ tri[1][0] - tri[0][0], tri[1][1] - tri[0][1] };
-    const v2a = [2]f32{ p.x - tri[0][0], p.y - tri[0][1] };
-    const dot00 = v0[0]*v0[0] + v0[1]*v0[1];
-    const dot01 = v0[0]*v1[0] + v0[1]*v1[1];
-    const dot02 = v0[0]*v2a[0] + v0[1]*v2a[1];
-    const dot11 = v1[0]*v1[0] + v1[1]*v1[1];
-    const dot12 = v1[0]*v2a[0] + v1[1]*v2a[1];
-    const invDenom = 1.0 / (dot00 * dot11 - dot01 * dot01);
-    const u = (dot11 * dot02 - dot01 * dot12) * invDenom;
-    const v = (dot00 * dot12 - dot01 * dot02) * invDenom;
-    return (u >= 0) and (v >= 0) and (u + v < 1);
+fn point_in_triangle(p: v2, t: [3][3]f32) bool {
+    const a = [2]f32{ t[2][0] - t[0][0], t[2][1] - t[0][1] };
+    const b = [2]f32{ t[1][0] - t[0][0], t[1][1] - t[0][1] };
+    const c = [2]f32{ p.pos[0] - t[0][0], p.pos[1] - t[0][1] };
+    const inv = 1.0 / (
+    //   a[0] * a[0] + a[1] * a[1] -> get d between a[0] and a[1]
+        (a[0] * a[0] + a[1] * a[1]) * (b[0] * b[0] + b[1] * b[1]) -
+        (a[0] * b[0] + a[1] * b[1]) * (a[0] * b[0] + a[1] * b[1]));
+    const u = (
+        (b[0] * b[0] + b[1] * b[1]) * (a[0] * c[0] + a[1] * c[1]) -
+        (a[0] * b[0] + a[1] * b[1]) * (b[0] * c[0] + b[1] * c[1]))*inv;
+    const v = (
+        (a[0] * a[0] + a[1] * a[1]) * (b[0] * c[0] + b[1] * c[1]) -
+        (a[0] * b[0] + a[1] * b[1]) * (a[0] * c[0] + a[1] * c[1]))*inv;
+    return u >= 0 and v >= 0 and u + v <= 1;
 }
 
 export fn init() void {
@@ -97,30 +98,30 @@ export fn frame() void {
         .dpi_scale = sapp.dpiScale(),
     });
 
-    state.mouse_pos = v2{
-        .x = - 1.0 + (ig.igGetMousePos().x / @as(f32, @floatFromInt(sapp.width ()))) * 2.0,
-        .y =   1.0 - (ig.igGetMousePos().y / @as(f32, @floatFromInt(sapp.height()))) * 2.0,
-    };
-    var tri: [3][3] f32 = undefined;
+    state.mouse_pos.pos[0] = - 1.0 + (ig.igGetMousePos().x / @as(f32, @floatFromInt(sapp.width ()))) * 2.0;
+    state.mouse_pos.pos[1] =   1.0 - (ig.igGetMousePos().y / @as(f32, @floatFromInt(sapp.height()))) * 2.0;
     // loop over v to get pos
+    var tri: [3][3]f32 = undefined;
     for (state.vertices[0..3], 0..) |vert, i| tri[i] = vert.pos;
-    if (ig.igIsMouseClicked(0) and
-        pointInTriangle(state.mouse_pos, tri)) { state.show_w = !state.show_w; }
+    if (ig.igIsMouseClicked(0) and point_in_triangle(state.mouse_pos, tri)) {
+        state.show_w = true;
+    }
 
     // ui-code
     if (ig.igBegin("STATUS", &state.b, ig.ImGuiWindowFlags_None)) {
         _ = ig.igColorEdit3("Background", &state.pass_action.colors[0].clear_value.r, ig.ImGuiColorEditFlags_None);
         _ = ig.igText("Dear ImGui Version: %s", ig.IMGUI_VERSION);
-    }
-    ig.igEnd();
+    } ig.igEnd();
     if (state.show_w) {
         if (ig.igBegin("TRIANGLE", &state.b, ig.ImGuiWindowFlags_None)) {
             _ = ig.igColorEdit3("Color1", &state.vertices[0].color, ig.ImGuiColorEditFlags_None);
             _ = ig.igColorEdit3("Color2", &state.vertices[1].color, ig.ImGuiColorEditFlags_None);
             _ = ig.igColorEdit3("Color3", &state.vertices[2].color, ig.ImGuiColorEditFlags_None);
-            ig.igEnd();
-        }
-    }
+            _ = ig.igDragFloat2Ex("Pos1", &state.vertices[0].pos[0], 0.1, -50, 50, "%.3f", ig.ImGuiColorEditFlags_None);
+            _ = ig.igDragFloat2Ex("Pos2", &state.vertices[1].pos[0], 0.1, -50, 50, "%.3f", ig.ImGuiColorEditFlags_None);
+            _ = ig.igDragFloat2Ex("Pos3", &state.vertices[2].pos[0], 0.1, -50, 50, "%.3f", ig.ImGuiColorEditFlags_None);
+        } ig.igEnd();
+    } // ig.igEnd();
 
     // update
     sg.updateBuffer(state.bind.vertex_buffers[0], sg.asRange(&state.vertices));
@@ -130,9 +131,11 @@ export fn frame() void {
         .action = state.pass_action,
         .swapchain = sglue.swapchain()
     });
+
     sg.applyPipeline(state.pip);
     sg.applyBindings(state.bind);
     sg.draw(0, 3, 1);
+
     simgui.render();
     sg.endPass();
     sg.commit();
@@ -155,8 +158,8 @@ pub fn main() void {
         .cleanup_cb = cleanup,
         .event_cb = event,
         .window_title = "DEMO",
-        .width = 800,
-        .height = 600,
+        .width = 1400,
+        .height = 800,
         .icon = .{ .sokol_default = true },
         .logger = .{ .func = slog.func },
     });

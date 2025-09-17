@@ -63,7 +63,8 @@ export fn init() void {
     }
     // initialize vertex buffer with triangle vertices
     state.bind.vertex_buffers[0] = sg.makeBuffer(.{
-        .data = sg.asRange(&state.vertices),
+        .size = @sizeOf([3]v2c),
+        .usage = sg.BufferUsage{ .stream_update = true },
     });
     // initialize a shader and pipeline object
     state.pip = sg.makePipeline(.{
@@ -114,13 +115,15 @@ export fn frame() void {
     ig.igEnd();
     if (state.show_w) {
         if (ig.igBegin("TRIANGLE", &state.b, ig.ImGuiWindowFlags_None)) {
-            _ = ig.igColorEdit3("Color1", &state.vertices[0].color, ig.ImGuiWindowFlags_None);
-            _ = ig.igColorEdit3("Color2", &state.vertices[1].color, ig.ImGuiWindowFlags_None);
-            _ = ig.igColorEdit3("Color3", &state.vertices[2].color, ig.ImGuiWindowFlags_None);
+            _ = ig.igColorEdit3("Color1", &state.vertices[0].color, ig.ImGuiColorEditFlags_None);
+            _ = ig.igColorEdit3("Color2", &state.vertices[1].color, ig.ImGuiColorEditFlags_None);
+            _ = ig.igColorEdit3("Color3", &state.vertices[2].color, ig.ImGuiColorEditFlags_None);
             ig.igEnd();
         }
     }
-    // ui-code
+
+    // update
+    sg.updateBuffer(state.bind.vertex_buffers[0], sg.asRange(&state.vertices));
 
     // sokol-gfx pass
     sg.beginPass(.{

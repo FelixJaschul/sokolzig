@@ -59,9 +59,9 @@ export fn init() void {
     simgui.setup(.{
         .logger = .{ .func = slog.func },
     });
-    if (use_docking) {
-        ig.igGetIO().*.ConfigFlags |= ig.ImGuiConfigFlags_DockingEnable;
-    }
+    const io = ig.igGetIO();
+    if (use_docking) io.*.ConfigFlags |= ig.ImGuiConfigFlags_DockingEnable;
+    io.*.IniFilename = "src/imgui.ini";
     // initialize vertex buffer with triangle vertices
     state.bind.vertex_buffers[0] = sg.makeBuffer(.{
         .size = @sizeOf([3]v2c),
@@ -77,10 +77,6 @@ export fn init() void {
             break :init l;
         },
     });
-
-    // initialize imgui save
-    const io = ig.igGetIO();
-    io.*.IniFilename = "src/imgui.ini";
 
     // initial clear color
     state.pass_action.colors[0] = .{
@@ -102,7 +98,9 @@ export fn frame() void {
     state.mouse_pos.pos[1] =   1.0 - (ig.igGetMousePos().y / @as(f32, @floatFromInt(sapp.height()))) * 2.0;
     // loop over v to get pos
     var tri: [3][3]f32 = undefined;
-    for (state.vertices[0..3], 0..) |vert, i| tri[i] = vert.pos;
+    for (state.vertices[0..3], 0..) |vert, i| {
+        tri[i] = vert.pos;
+    }
     if (ig.igIsMouseClicked(0) and point_in_triangle(state.mouse_pos, tri)) {
         state.show_w = true;
     }

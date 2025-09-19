@@ -18,6 +18,23 @@ const v2c = struct {
     color: [4]f32,
 };
 
+const wall_segment = struct {
+    pos: [4]f32, // x1, y1 (Start-point) //  x2, y2 (End-point)
+};
+
+const sector = struct {
+    floor_height: f32,
+    ceil_height: f32,
+    walls: wall_segment,
+};
+
+const mesh = struct {
+    vbuf: sg.Buffer,  // Sokol vertex buffer
+    ibuf: sg.Buffer,  // Sokol index buffer (optional, but good for shared vertices)
+    num_vertices: i32,
+    num_indices: i32,
+};
+
 const state = struct {
     var pass_action: sg.PassAction = .{};
     var b: bool = true;

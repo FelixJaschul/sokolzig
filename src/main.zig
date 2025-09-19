@@ -29,8 +29,8 @@ const sector = struct {
 };
 
 const mesh = struct {
-    vbuf: sg.Buffer,  // Sokol vertex buffer
-    ibuf: sg.Buffer,  // Sokol index buffer (optional, but good for shared vertices)
+    vbuf: sg.Buffer,
+    ibuf: sg.Buffer,
     num_vertices: i32,
     num_indices: i32,
 };

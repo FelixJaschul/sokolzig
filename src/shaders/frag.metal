@@ -1,6 +1,11 @@
-#version 410
-in vec4 color;
-out vec4 frag_color;
-void main() {
-    frag_color = color;
+#include <metal_stdlib>
+using namespace metal;
+
+struct VertexOut {
+    float4 position [[position]];
+    float4 color;
+};
+
+fragment float4 fragment_main(VertexOut in [[stage_in]]) {
+    return in.color;
 }

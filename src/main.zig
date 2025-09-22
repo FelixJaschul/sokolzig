@@ -17,11 +17,11 @@ fn loadShader(allocator: std.mem.Allocator, path: []const u8) ![]u8 {
 }
 
 // At compile time these files are read and included as []const u8
-const vs_bytes = @embedFile("shaders/vert.glsl");
-const fs_bytes = @embedFile("shaders/frag.glsl");
+const vs_bytes = @embedFile("shaders/vert.metal");
+const fs_bytes = @embedFile("shaders/frag.metal");
 
 const Camera = struct {
-    pos: [3]f32 = .{ 0, 2.5, 10 },
+    pos: [3]f32 = .{ 0, 2.5, 0 },
     rot: [3]f32 = .{ 0, 0, 0 },
     forward: [3]f32 = .{ 0, 0, -1 },
 };
@@ -90,58 +90,57 @@ export fn init() void {
 
     const vs_src = sg.ShaderFunction{
         .source = vs_bytes.ptr,
+        .entry  = "vertex_main",
     };
     const fs_src = sg.ShaderFunction{
         .source = fs_bytes.ptr,
+        .entry  = "fragment_main",
     };
 
+    // in init(), after shader setup
     state.pip = sg.makePipeline(.{
         .shader = sg.makeShader(sg.ShaderDesc{
-            .vertex_func = vs_src,
+            .vertex_func   = vs_src,
             .fragment_func = fs_src,
-            .uniform_blocks = [_]sg.ShaderUniformBlock{ // exactly 8 elements
-                .{ // slot 0
-                    .size = 64,
-                        .glsl_uniforms = [_]sg.GlslShaderUniform{
-                            .{ .glsl_name = "view_proj", .type = .MAT4 },
-                            .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, // pad to 16 uniforms if required
+            .attrs = [16]sg.ShaderVertexAttr{
+                .{ .glsl_name = "position" },
+                .{ .glsl_name = "color" },
+                .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{},
+            },
+            .uniform_blocks = [8]sg.ShaderUniformBlock{
+                .{ .size = 64,
+                    .stage = .VERTEX,
+                    .glsl_uniforms = [_]sg.GlslShaderUniform{
+                        .{ .glsl_name = "view_proj", .type = .MAT4 },
+                        .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{},
                     },
                 },
-                .{}, .{}, .{}, .{}, .{}, .{}, .{},          // pad remaining 7 blocks
-            },
-            .attrs = [_]sg.ShaderVertexAttr{
-                .{ .glsl_name = "position" },
-                .{ .hlsl_sem_name = "color0" },
-                .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, // pad to 16 attrs if struct requires
+                .{}, .{}, .{}, .{}, .{}, .{}, .{},
             },
         }),
-
         .layout = .{
             .attrs = [_]sg.VertexAttrState{
-                .{ .format = .FLOAT3 },
-                .{ .format = .FLOAT4 },
-                .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, // pad to 16 attrs if struct requires
+                .{ .format = .FLOAT3 }, // position
+            .{ .format = .FLOAT4 }, // color
+            .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{}, .{},
             },
         },
-        .depth = .{
-            .write_enabled = true,
-            .compare = .LESS_EQUAL,
-        },
+        .primitive_type = .TRIANGLES,
+        .index_type = .UINT32, // <- changed to 32-bit indices
     });
 
+    // vertex buffer (streaming)
     state.bind.vertex_buffers[0] = sg.makeBuffer(.{
         .size = 1024 * 1024 * @sizeOf(f32),
-        .usage = sg.BufferUsage{
-            .stream_update = true,
-        },
+        .usage = sg.BufferUsage{ .stream_update = true },
     });
+
+    // index buffer (streaming + index intent)
     state.bind.index_buffer = sg.makeBuffer(.{
-        .size = 1024 * 1024 * @sizeOf(u16),
-        // .type = .INDEXBUFFER,
-        .usage = sg.BufferUsage{
-            .stream_update = true,
-        },
+        .size = 1024 * 1024 * @sizeOf(u32),
+        .usage = sg.BufferUsage{ .stream_update = true, .index_buffer = true },
     });
+
 
     // initial clear color
     state.pass_action.colors[0] = .{
@@ -159,7 +158,7 @@ export fn frame() void {
         .dpi_scale = sapp.dpiScale(),
     });
 
-    // ui-code
+    // UI
     if (ig.igBegin("STATUS", &state.b, 0)) {
         _ = ig.igColorEdit3("Background", &state.pass_action.colors[0].clear_value.r, 0);
         _ = ig.igText("Dear ImGui Version: %s", ig.IMGUI_VERSION);
@@ -168,7 +167,7 @@ export fn frame() void {
 
     const aspect = sapp.widthf() / sapp.heightf();
     const proj = perspective(45.0, aspect, 0.01, 100.0);
-    const view = look_at(state.camera.pos, add(state.camera.pos, state.camera.forward), .{ 0, 1, 0 });
+    const view = look_at(state.camera.pos, add(state.camera.pos, state.camera.forward), .{0,1,0});
     const view_proj = mul(proj, view);
 
     const current_sector = get_current_sector(state.level, state.camera.pos);
@@ -178,18 +177,29 @@ export fn frame() void {
         std.debug.print("Outside of any sector\n", .{});
     }
 
-    var vertices: [1024 * 1024]f32 = undefined;
-    var indices: [1024 * 1024]u16 = undefined;
-    var vertex_offset: u32 = 0;
-    var index_offset: u32 = 0;
+    // --- dynamic buffers (handle OOM gracefully) ---
+    const allocator = std.heap.page_allocator;
+    var vertex_list = std.ArrayList(f32).initCapacity(allocator, 1024) catch {
+        std.debug.print("OOM: vertex_list\n", .{});
+        return;
+    };
+    defer vertex_list.deinit(allocator);
+
+    var index_list = std.ArrayList(u32).initCapacity(allocator, 1024) catch {
+        std.debug.print("OOM: index_list\n", .{});
+        return;
+    };
+    defer index_list.deinit(allocator);
 
     var queue: [32]struct { sector_id: usize, x_min: i32, x_max: i32 } = undefined;
     var queue_len: usize = 0;
 
-    if (get_current_sector(state.level, state.camera.pos)) |sector_id| {
-        queue[0] = .{ .sector_id = sector_id, .x_min = 0, .x_max = sapp.width() };
+    if (current_sector) |sector_id| {
+        queue[0] = .{ .sector_id = sector_id, .x_min = 0, .x_max = @intCast(sapp.width()) };
         queue_len = 1;
     }
+
+    var vertex_offset: u32 = 0;
 
     while (queue_len > 0) {
         queue_len -= 1;
@@ -197,26 +207,20 @@ export fn frame() void {
         const sector = state.level.sectors[entry.sector_id];
 
         for (sector.walls) |wall| {
-            // transform wall to camera space
+            // transform / rotate / project (unchanged)
             const p1 = .{ wall.points[0][0] - state.camera.pos[0], wall.points[0][1] - state.camera.pos[2] };
             const p2 = .{ wall.points[1][0] - state.camera.pos[0], wall.points[1][1] - state.camera.pos[2] };
-
-            // rotate
             const sin = std.math.sin(state.camera.rot[1]);
             const cos = std.math.cos(state.camera.rot[1]);
             const p1_rot = .{ p1[0] * cos - p1[1] * sin, p1[0] * sin + p1[1] * cos };
             const p2_rot = .{ p2[0] * cos - p2[1] * sin, p2[0] * sin + p2[1] * cos };
-
-            // project
+            if (p1_rot[1] <= 0 or p2_rot[1] <= 0) continue;
             const p1_proj = .{ -p1_rot[0] * 200 / p1_rot[1], 0 };
             const p2_proj = .{ -p2_rot[0] * 200 / p2_rot[1], 0 };
 
-            // clip
             var x1 = @as(i32, @intFromFloat(p1_proj[0] + sapp.widthf() / 2));
             var x2 = @as(i32, @intFromFloat(p2_proj[0] + sapp.widthf() / 2));
-
             if (x1 >= x2 or x2 < entry.x_min or x1 > entry.x_max) continue;
-
             x1 = @max(x1, entry.x_min);
             x2 = @min(x2, entry.x_max);
 
@@ -242,21 +246,28 @@ export fn frame() void {
             };
             const wall_indices: [6]u16 = .{ 0, 1, 2, 0, 2, 3 };
 
-            @memcpy(vertices[vertex_offset * 7 ..][0..wall_vertices.len], &wall_vertices);
-            for (wall_indices) |index| {
-                indices[index_offset] = @intCast(index + vertex_offset);
-                index_offset += 1;
+            for (wall_vertices) |v| {
+                vertex_list.append(allocator, v) catch @panic("vertex_list OOM");
+            }
+
+            for (wall_indices) |i| {
+                index_list.append(allocator, i) catch @panic("index_list OOM");
+            }
+
+            for (wall_indices) |idx| {
+                index_list.append(allocator, @intCast(idx + vertex_offset))
+                    catch @panic("index_list OOM");
             }
 
             vertex_offset += 4;
-            index_offset += 6;
         }
     }
 
-    sg.updateBuffer(state.bind.vertex_buffers[0], sg.asRange(&vertices));
-    sg.updateBuffer(state.bind.index_buffer, sg.asRange(&indices));
+    // upload only used slices
+    sg.updateBuffer(state.bind.vertex_buffers[0], sg.asRange(vertex_list.items[0..vertex_list.items.len]));
+    sg.updateBuffer(state.bind.index_buffer, sg.asRange(index_list.items[0..index_list.items.len]));
 
-    // sokol-gfx pass
+    // sokol/gfx rendering
     sg.beginPass(.{
         .action = state.pass_action,
         .swapchain = sglue.swapchain(),
@@ -265,7 +276,7 @@ export fn frame() void {
     sg.applyPipeline(state.pip);
     sg.applyBindings(state.bind);
     sg.applyUniforms(0, sg.asRange(&view_proj));
-    sg.draw(0, @intCast(index_offset), 1);
+    sg.draw(0, @intCast(index_list.items.len), 1);
 
     simgui.render();
     sg.endPass();

@@ -162,6 +162,7 @@ export fn frame() void {
     if (ig.igBegin("STATUS", &state.b, 0)) {
         _ = ig.igColorEdit3("Background", &state.pass_action.colors[0].clear_value.r, 0);
         _ = ig.igText("Dear ImGui Version: %s", ig.IMGUI_VERSION);
+        _ = ig.igText("POS: %f / %f / %f", state.camera.pos[0], state.camera.pos[1], state.camera.pos[2]);
     }
     ig.igEnd();
 
@@ -264,6 +265,7 @@ export fn frame() void {
     }
 
     // upload only used slices
+    // std.debug.print("verts: {d}, indices: {d}\n", .{ vertex_list.items.len, index_list.items.len });
     sg.updateBuffer(state.bind.vertex_buffers[0], sg.asRange(vertex_list.items[0..vertex_list.items.len]));
     sg.updateBuffer(state.bind.index_buffer, sg.asRange(index_list.items[0..index_list.items.len]));
 

@@ -24,23 +24,6 @@ const state = struct {
     var mouse_pos: math.v2 = undefined;
 };
 
-fn point_in_triangle(p: math.v2, t: [3][3]f32) bool {
-    const a = [2]f32{ t[2][0] - t[0][0], t[2][1] - t[0][1] };
-    const b = [2]f32{ t[1][0] - t[0][0], t[1][1] - t[0][1] };
-    const c = [2]f32{ p.pos[0] - t[0][0], p.pos[1] - t[0][1] };
-    const inv = 1.0 / (
-    //   a[0] * a[0] + a[1] * a[1] -> get dist between a[0] and a[1]
-        (a[0] * a[0] + a[1] * a[1]) * (b[0] * b[0] + b[1] * b[1]) -
-        (a[0] * b[0] + a[1] * b[1]) * (a[0] * b[0] + a[1] * b[1]));
-    const u = (
-        (b[0] * b[0] + b[1] * b[1]) * (a[0] * c[0] + a[1] * c[1]) -
-        (a[0] * b[0] + a[1] * b[1]) * (b[0] * c[0] + b[1] * c[1])) * inv;
-    const v = (
-        (a[0] * a[0] + a[1] * a[1]) * (b[0] * c[0] + b[1] * c[1]) -
-        (a[0] * b[0] + a[1] * b[1]) * (a[0] * c[0] + a[1] * c[1])) * inv;
-    return u >= 0 and v >= 0 and u + v <= 1;
-}
-
 export fn init() void {
     // initialize sokol-gfx
     sg.setup(.{
@@ -93,7 +76,7 @@ export fn frame() void {
     for (state.vertices[0..3], 0..) |vert, i| {
         tri[i] = vert.pos;
     }
-    if (ig.igIsMouseClicked(0) and point_in_triangle(state.mouse_pos, tri)) {
+    if (ig.igIsMouseClicked(0) and math.point_in_triangle(state.mouse_pos, tri)) {
         state.show_w = true;
     }
 

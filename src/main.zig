@@ -1,3 +1,4 @@
+const std = @import("std");
 const use_docking = @import("build_options").docking;
 const ig = if (use_docking) @import("cimgui_docking") else @import("cimgui");
 const sokol = @import("sokol");
@@ -7,49 +8,23 @@ const sg = sokol.gfx;
 const sapp = sokol.app;
 const sglue = sokol.glue;
 const simgui = sokol.imgui;
-const std = @import("std");
-
-const v2 = struct {
-    pos: [3]f32,
-};
-
-const v2c = struct {
-    pos: [3]f32,
-    color: [4]f32,
-};
-
-const wall_segment = struct {
-    pos: [4]f32, // x1, y1 (Start-point) //  x2, y2 (End-point)
-};
-
-const sector = struct {
-    floor_height: f32,
-    ceil_height: f32,
-    walls: wall_segment,
-};
-
-const mesh = struct {
-    vbuf: sg.Buffer,
-    ibuf: sg.Buffer,
-    num_vertices: i32,
-    num_indices: i32,
-};
+const math = @import("math.zig");
 
 const state = struct {
     var pass_action: sg.PassAction = .{};
     var b: bool = true;
     var bind: sg.Bindings = .{};
     var pip: sg.Pipeline = .{};
-    var vertices: [3]v2c = [3]v2c{
-        v2c{ .pos = .{ 0.0,  0.5,  0.5 }, .color = .{ 1.0, 0.0, 0.9, 1.0 } },
-        v2c{ .pos = .{ 0.5, -0.5,  0.5 }, .color = .{ 0.0, 1.0, 0.9, 1.0 } },
-        v2c{ .pos = .{ -0.5, -0.5, 0.5 }, .color = .{ 0.0, 0.0, 1.0, 1.0 } },
+    var vertices: [3]math.v2c = [3]math.v2c{
+        math.v2c{ .pos = .{ 0.0,  0.5,  0.5 }, .color = .{ 1.0, 0.0, 0.9, 1.0 } },
+        math.v2c{ .pos = .{ 0.5, -0.5,  0.5 }, .color = .{ 0.0, 1.0, 0.9, 1.0 } },
+        math.v2c{ .pos = .{ -0.5, -0.5, 0.5 }, .color = .{ 0.0, 0.0, 1.0, 1.0 } },
     };
     var show_w: bool = false;
-    var mouse_pos: v2 = undefined;
+    var mouse_pos: math.v2 = undefined;
 };
 
-fn point_in_triangle(p: v2, t: [3][3]f32) bool {
+fn point_in_triangle(p: math.v2, t: [3][3]f32) bool {
     const a = [2]f32{ t[2][0] - t[0][0], t[2][1] - t[0][1] };
     const b = [2]f32{ t[1][0] - t[0][0], t[1][1] - t[0][1] };
     const c = [2]f32{ p.pos[0] - t[0][0], p.pos[1] - t[0][1] };
@@ -58,10 +33,10 @@ fn point_in_triangle(p: v2, t: [3][3]f32) bool {
         (a[0] * a[0] + a[1] * a[1]) * (b[0] * b[0] + b[1] * b[1]) -
         (a[0] * b[0] + a[1] * b[1]) * (a[0] * b[0] + a[1] * b[1]));
     const u = (
-    (b[0] * b[0] + b[1] * b[1]) * (a[0] * c[0] + a[1] * c[1]) -
+        (b[0] * b[0] + b[1] * b[1]) * (a[0] * c[0] + a[1] * c[1]) -
         (a[0] * b[0] + a[1] * b[1]) * (b[0] * c[0] + b[1] * c[1])) * inv;
     const v = (
-    (a[0] * a[0] + a[1] * a[1]) * (b[0] * c[0] + b[1] * c[1]) -
+        (a[0] * a[0] + a[1] * a[1]) * (b[0] * c[0] + b[1] * c[1]) -
         (a[0] * b[0] + a[1] * b[1]) * (a[0] * c[0] + a[1] * c[1])) * inv;
     return u >= 0 and v >= 0 and u + v <= 1;
 }
@@ -81,7 +56,7 @@ export fn init() void {
     io.*.IniFilename = "src/imgui.ini";
     // initialize vertex buffer with triangle vertices
     state.bind.vertex_buffers[0] = sg.makeBuffer(.{
-        .size = @sizeOf([3]v2c),
+        .size = @sizeOf([3]math.v2c),
         .usage = sg.BufferUsage{ .stream_update = true },
     });
     // initialize a shader and pipeline object

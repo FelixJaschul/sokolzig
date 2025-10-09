@@ -4,6 +4,8 @@ Sample project for using Dear ImGui with the Sokol Zig bindings.
 
 > NOTE: please use the latest Zig
 
+![ALt text](./GAME.png)
+
 On macOS, Windows and Linux just run:
 
 `zig build run`
